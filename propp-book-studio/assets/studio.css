@@ -1,0 +1,335 @@
+.pbs-wrapper {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 32px;
+	max-width: 1180px;
+	margin: 24px auto;
+	font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	color: #1e293b;
+	align-items: start;
+}
+
+@media (max-width: 900px) {
+	.pbs-wrapper {
+		grid-template-columns: 1fr;
+	}
+}
+
+.pbs-preview-column {
+	background: #f8fafc;
+	border: 1px solid #e2e8f0;
+	border-radius: 16px;
+	padding: 20px;
+	position: sticky;
+	top: 24px;
+}
+
+.pbs-preview-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 12px;
+	font-size: 13px;
+}
+
+.pbs-format-badge {
+	background: #e0e7ff;
+	color: #3730a3;
+	font-weight: 700;
+	padding: 4px 10px;
+	border-radius: 99px;
+}
+
+.pbs-bleed-toggle {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	cursor: pointer;
+	color: #475569;
+}
+
+.pbs-canvas-stage {
+	position: relative;
+	width: 100%;
+	aspect-ratio: 1 / 1;
+	background: #ffffff;
+	border-radius: 10px;
+	overflow: hidden;
+	box-shadow: 0 12px 28px -6px rgba(15, 23, 42, 0.14);
+}
+
+#pbs-scene-canvas {
+	width: 100%;
+	height: 100%;
+	display: block;
+}
+
+/* Linea di taglio 3mm su 206mm totali (~1.45% per lato) */
+.pbs-bleed-overlay {
+	position: absolute;
+	inset: 1.45%;
+	border: 2px dashed #ef4444;
+	pointer-events: none;
+	box-shadow: 0 0 0 999px rgba(239, 68, 68, 0.12);
+}
+
+.pbs-page-nav {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-top: 14px;
+	font-weight: 600;
+	font-size: 14px;
+}
+
+.pbs-baked-status {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	margin-top: 16px;
+	padding: 10px 14px;
+	background: #ffffff;
+	border: 1px dashed #cbd5e1;
+	border-radius: 10px;
+}
+
+#pbs-baked-preview-img {
+	width: 56px;
+	height: 56px;
+	object-fit: contain;
+	background: repeating-conic-gradient(#f1f5f9 0% 25%, #ffffff 0% 50%) 50% / 12px 12px;
+	border-radius: 8px;
+	border: 1px solid #e2e8f0;
+}
+
+.pbs-baked-info {
+	display: flex;
+	flex-direction: column;
+	font-size: 12px;
+	color: #64748b;
+}
+
+.pbs-baked-info strong {
+	color: #0f172a;
+	font-size: 13px;
+}
+
+/* Colonna Controlli */
+.pbs-controls-column {
+	background: #ffffff;
+	border: 1px solid #e2e8f0;
+	border-radius: 16px;
+	padding: 24px;
+}
+
+.pbs-tabs {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 8px;
+	background: #f1f5f9;
+	padding: 6px;
+	border-radius: 12px;
+	margin-bottom: 22px;
+}
+
+.pbs-tab {
+	border: none;
+	background: transparent;
+	padding: 10px 12px;
+	font-weight: 700;
+	font-size: 14px;
+	color: #475569;
+	border-radius: 8px;
+	cursor: pointer;
+}
+
+.pbs-tab.active {
+	background: #ffffff;
+	color: #0f172a;
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.pbs-step-panel {
+	display: none;
+}
+
+.pbs-step-panel.active {
+	display: block;
+}
+
+.pbs-field-group {
+	margin-bottom: 18px;
+}
+
+.pbs-field-group label {
+	display: block;
+	font-weight: 600;
+	font-size: 13px;
+	margin-bottom: 8px;
+	color: #334155;
+}
+
+.pbs-field-row {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 14px;
+}
+
+#pbs-child-name {
+	width: 100%;
+	padding: 11px 14px;
+	border: 1px solid #cbd5e1;
+	border-radius: 8px;
+	font-size: 15px;
+	box-sizing: border-box;
+}
+
+.pbs-pill-selector,
+.pbs-hair-grid,
+.pbs-propp-options {
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	gap: 8px;
+}
+
+.pbs-pill,
+.pbs-choice-card {
+	padding: 10px 12px;
+	border: 1px solid #cbd5e1;
+	background: #ffffff;
+	border-radius: 8px;
+	font-weight: 600;
+	font-size: 13px;
+	cursor: pointer;
+	transition: all 0.15s ease;
+	text-align: center;
+}
+
+.pbs-pill.active,
+.pbs-choice-card.active {
+	border-color: #2563eb;
+	background: #eff6ff;
+	color: #1d4ed8;
+	box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.pbs-swatches {
+	display: flex;
+	gap: 12px;
+	flex-wrap: wrap;
+}
+
+.pbs-swatch {
+	width: 38px;
+	height: 38px;
+	border-radius: 50%;
+	border: 3px solid #ffffff;
+	box-shadow: 0 0 0 1px #cbd5e1;
+	cursor: pointer;
+	transition: transform 0.15s ease;
+}
+
+.pbs-swatch.active {
+	transform: scale(1.14);
+	box-shadow: 0 0 0 2px #2563eb;
+}
+
+.pbs-propp-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 12px;
+	background: #f8fafc;
+	padding: 12px;
+	border-radius: 10px;
+	margin-bottom: 16px;
+	font-size: 13px;
+}
+
+.pbs-propp-header p {
+	margin: 0;
+}
+
+.pbs-propp-block {
+	margin-bottom: 16px;
+	padding-bottom: 14px;
+	border-bottom: 1px solid #f1f5f9;
+}
+
+.pbs-propp-block h4 {
+	margin: 0 0 8px 0;
+	font-size: 14px;
+	color: #0f172a;
+}
+
+.pbs-purchase-box {
+	background: #f8fafc;
+	border: 1px solid #e2e8f0;
+	padding: 18px;
+	border-radius: 12px;
+	margin-top: 20px;
+}
+
+.pbs-price-row {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 14px;
+}
+
+.pbs-price-label {
+	display: block;
+	font-weight: 700;
+	font-size: 15px;
+}
+
+.pbs-price-tag {
+	font-size: 24px;
+	font-weight: 800;
+	color: #0f172a;
+}
+
+.pbs-btn-primary,
+.pbs-btn-buy {
+	background: #2563eb;
+	color: #ffffff;
+	border: none;
+	padding: 13px 18px;
+	border-radius: 10px;
+	font-weight: 700;
+	font-size: 15px;
+	cursor: pointer;
+	width: 100%;
+}
+
+.pbs-btn-buy {
+	background: #16a34a;
+}
+
+.pbs-btn-secondary {
+	background: #ffffff;
+	border: 1px solid #cbd5e1;
+	padding: 8px 14px;
+	border-radius: 8px;
+	font-weight: 600;
+	font-size: 13px;
+	cursor: pointer;
+}
+
+.pbs-full-width {
+	width: 100%;
+}
+
+.pbs-feedback {
+	margin-top: 12px;
+	font-size: 14px;
+	font-weight: 600;
+}
+
+.pbs-feedback.success {
+	color: #15803d;
+}
+
+.pbs-feedback.error {
+	color: #b91c1c;
+}
