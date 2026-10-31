@@ -29,7 +29,8 @@
 
 	function init() {
 		var app = document.getElementById('crealibro-app');
-		if (!app || !E || !D) return;
+		if (!app) return;
+		if (!E || !D) throw new Error(!E ? 'engine.js non caricato' : 'dati del catalogo mancanti');
 		var cat = D.catalog;
 		var money = function (v) {
 			try { return new Intl.NumberFormat('it-IT', { style: 'currency', currency: D.currency || 'EUR' }).format(v); } catch (e) { return v + ' €'; }
@@ -327,6 +328,17 @@
 		refreshAvatar();
 	}
 
-	if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-	else init();
+	function start() {
+		try {
+			init();
+		} catch (err) {
+			// Mostra l'errore invece di lasciare la pagina ferma su "Caricamento…"
+			var app = document.getElementById('crealibro-app');
+			if (app) app.innerHTML = '<p class="clc-loading">Il configuratore ha incontrato un errore: ' + String(err && err.message ? err.message : err).replace(/[<>&]/g, '') + '</p>';
+			if (window.console) console.error('CreaLibro:', err);
+		}
+	}
+
+	if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+	else start();
 })();

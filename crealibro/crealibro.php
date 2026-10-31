@@ -2,7 +2,7 @@
 /**
  * Plugin Name: CreaLibro - Libri illustrati personalizzati
  * Description: Configuratore di libri illustrati personalizzati a doppia pagina: il cliente crea il bambino, sceglie l'ambientazione e compone la storia a blocchi. Editor visuale in wp-admin, carrello WooCommerce e PDF di stampa a pagine singole.
- * Version: 2.0.0
+ * Version: 2.0.1
  * Author: Giuseppe Calò
  * Text Domain: crealibro
  */
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class CreaLibro {
 
-	const VERSION = '2.0.0';
+	const VERSION = '2.0.1';
 
 	const PHASES = array(
 		'equilibrio'     => 'Equilibrio iniziale',
@@ -40,7 +40,8 @@ class CreaLibro {
 
 		add_action( 'init', array( $this, 'ensure_environment' ) );
 		add_shortcode( 'crealibro', array( $this, 'render_shortcode' ) );
-		add_action( 'wp_enqueue_scripts', array( $this, 'register_assets' ) );
+		// Registrati già su init: con i temi a blocchi lo shortcode viene eseguito prima di wp_enqueue_scripts
+		add_action( 'init', array( $this, 'register_assets' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'register_admin_assets' ) );
 
 		add_action( 'admin_menu', array( $this, 'register_admin_menu' ) );
@@ -510,6 +511,9 @@ class CreaLibro {
 			$product_id = $this->get_or_create_wc_product();
 		}
 
+		if ( ! wp_script_is( 'crealibro-configurator', 'registered' ) ) {
+			$this->register_assets();
+		}
 		wp_enqueue_style( 'crealibro-configurator' );
 		wp_enqueue_script( 'crealibro-configurator' );
 		wp_add_inline_script(
@@ -527,7 +531,14 @@ class CreaLibro {
 			'before'
 		);
 
-		return '<div id="crealibro-app" class="clc-app"><p class="clc-loading">Caricamento del configuratore…</p></div>';
+		// Se dopo qualche secondo il configuratore non è partito, lo dice invece di restare su "Caricamento"
+		$hint = current_user_can( 'manage_options' )
+			? 'Avviso per l\'amministratore: gli script del plugin non sono stati eseguiti. Controlla la console del browser e, se usi plugin di cache o ottimizzazione, escludi engine.js e configurator.js di CreaLibro da unione, minificazione e caricamento ritardato.'
+			: 'Ricarica la pagina; se il problema continua, contattaci.';
+		$check = '<script>setTimeout(function(){var a=document.getElementById("crealibro-app");var l=a&&a.querySelector(".clc-loading");'
+			. 'if(l){l.textContent=' . wp_json_encode( 'Il configuratore non si è avviato. ' . $hint, JSON_UNESCAPED_UNICODE ) . ';}},8000);</script>';
+
+		return '<div id="crealibro-app" class="clc-app"><p class="clc-loading">Caricamento del configuratore…</p></div>' . $check;
 	}
 
 	/** Catalogo per il cliente: solo i formati attivi, senza dati interni. */
