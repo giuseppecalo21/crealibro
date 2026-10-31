@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Propp Book Studio - Libri Personalizzati 20x20
  * Description: Configuratore modulare basato sulle funzioni di Propp con Avatar PNG Baker, pannello Admin, scenari dinamici e generatore PDF 20x20cm per WooCommerce.
- * Version: 1.1.0
+ * Version: 1.2.0
  * Author: Giuseppe Calò
  * Text Domain: propp-book-studio
  */
@@ -12,6 +12,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class Propp_Book_Studio {
+
+	const VERSION = '1.2.0';
 
 	private static $instance = null;
 	private $upload_dir;
@@ -101,25 +103,57 @@ class Propp_Book_Studio {
 			'propp-studio-css',
 			plugin_dir_url( __FILE__ ) . 'assets/studio.css',
 			array(),
-			'1.1.0'
+			self::VERSION
 		);
 
 		wp_register_script(
 			'propp-studio-js',
 			plugin_dir_url( __FILE__ ) . 'assets/studio.js',
 			array(),
-			'1.1.0',
+			self::VERSION,
 			true
 		);
 	}
 
 	public function register_admin_assets( $hook ) {
-		// Se siamo nella pagina di gestione Propp Studio, attiva la Libreria Media di WP
+		// Pagina di gestione Propp Studio: Libreria Media + editor visuale delle scene
 		if ( 'toplevel_page_propp-book-studio' === $hook ) {
 			wp_enqueue_media();
+			$this->register_assets();
+			wp_enqueue_script( 'propp-studio-js' );
+
+			wp_enqueue_style(
+				'propp-studio-admin-css',
+				plugin_dir_url( __FILE__ ) . 'assets/admin.css',
+				array(),
+				self::VERSION
+			);
+			wp_enqueue_script(
+				'propp-studio-admin-js',
+				plugin_dir_url( __FILE__ ) . 'assets/admin.js',
+				array( 'propp-studio-js' ),
+				self::VERSION,
+				true
+			);
+			wp_add_inline_script(
+				'propp-studio-admin-js',
+				'window.ProppAdminData = ' . wp_json_encode(
+					array(
+						'manifest'      => $this->load_manifest(),
+						'steps'         => $this->get_step_config(),
+						'elementLabels' => array(
+							'avatar' => 'Bambino/a',
+							'prop'   => 'Oggetto magico',
+						),
+					),
+					JSON_UNESCAPED_UNICODE
+				) . ';',
+				'before'
+			);
+			return;
 		}
 
-		// Se siamo nella pagina ordini WooCommerce, carica studio.js per generare il PDF 300 DPI
+		// Pagina ordini WooCommerce: carica studio.js per generare il PDF 300 DPI
 		if ( strpos( $hook, 'shop_order' ) !== false || strpos( $hook, 'wc-orders' ) !== false || strpos( $hook, 'post.php' ) !== false ) {
 			$this->register_assets();
 			wp_enqueue_style( 'propp-studio-css' );
@@ -140,6 +174,150 @@ class Propp_Book_Studio {
 			}
 		}
 		return $this->get_default_manifest();
+	}
+
+	/**
+	 * Struttura di ogni fase di Propp: quali tavole influenza, quali elementi
+	 * compaiono in ciascuna tavola, quali immagini e testi si possono caricare.
+	 * Deve restare allineata a PAGE_DEFS in assets/studio.js.
+	 */
+	private function get_step_config() {
+		return array(
+			'1_setting'    => array(
+				'npc_label'      => '',
+				'has_prop_image' => false,
+				'has_npc_image'  => false,
+				'pages'          => array(
+					array(
+						'page'  => 1,
+						'label' => 'Pag. 1 · Ambiente',
+						'slots' => array( 'avatar_slot' => 'avatar' ),
+					),
+					array(
+						'page'  => 0,
+						'label' => 'Copertina',
+						'slots' => array(
+							'cover_avatar_slot' => 'avatar',
+							'cover_prop_slot'   => 'prop',
+						),
+					),
+					array(
+						'page'  => 5,
+						'label' => 'Pag. 5 · Ritorno',
+						'slots' => array(
+							'ending_avatar_slot' => 'avatar',
+							'ending_prop_slot'   => 'prop',
+						),
+					),
+				),
+				'tokens'         => array(
+					'place_name' => 'Nome del luogo ({place_name})',
+					'intro_text' => 'Testo pagina 1 (usa {nome}, {o_a}, {un_una}, {il_la})',
+				),
+			),
+			'2_donor'      => array(
+				'npc_label'      => 'Donatore',
+				'has_prop_image' => false,
+				'has_npc_image'  => true,
+				'pages'          => array(
+					array(
+						'page'  => 2,
+						'label' => 'Pag. 2 · Donatore',
+						'slots' => array(
+							'npc_slot'    => 'npc',
+							'avatar_slot' => 'avatar',
+						),
+					),
+				),
+				'tokens'         => array(
+					'donor_name' => 'Nome del donatore ({donor_name})',
+					'donor_text' => 'Testo pagina 2 (usa {nome}, {place_name})',
+				),
+			),
+			'3_magic_item' => array(
+				'npc_label'      => '',
+				'has_prop_image' => true,
+				'has_npc_image'  => false,
+				'pages'          => array(
+					array(
+						'page'  => 3,
+						'label' => 'Pag. 3 · Mezzo magico',
+						'slots' => array(
+							'avatar_slot' => 'avatar',
+							'prop_slot'   => 'prop',
+						),
+					),
+				),
+				'tokens'         => array(
+					'item_name'   => 'Nome dell\'oggetto ({item_name})',
+					'item_gift'   => 'Testo pagina 3 (consegna dell\'oggetto)',
+					'item_action' => 'Azione del climax ({item_action}, usata a pag. 4)',
+				),
+			),
+			'4_antagonist' => array(
+				'npc_label'      => 'Antagonista',
+				'has_prop_image' => false,
+				'has_npc_image'  => true,
+				'pages'          => array(
+					array(
+						'page'  => 4,
+						'label' => 'Pag. 4 · Sfida',
+						'slots' => array(
+							'npc_slot'    => 'npc',
+							'avatar_slot' => 'avatar',
+							'prop_slot'   => 'prop',
+						),
+					),
+				),
+				'tokens'         => array(
+					'villain_name' => 'Nome dell\'antagonista ({villain_name})',
+					'climax_text'  => 'Testo pagina 4 (usa {nome}, {item_action})',
+					'ending_text'  => 'Testo pagina 5, finale (usa {nome}, {place_name}, {item_name})',
+				),
+			),
+		);
+	}
+
+	/**
+	 * Posizioni predefinite: identiche a DEFAULT_SLOTS in assets/studio.js.
+	 */
+	private function get_default_slots() {
+		return array(
+			'1_setting'    => array(
+				'avatar_slot'        => array( 'x' => 50, 'y' => 54, 'scale' => 0.50, 'rotation' => 0 ),
+				'cover_avatar_slot'  => array( 'x' => 50, 'y' => 58, 'scale' => 0.56, 'rotation' => 0 ),
+				'cover_prop_slot'    => array( 'x' => 70, 'y' => 56, 'scale' => 0.22, 'rotation' => 0 ),
+				'ending_avatar_slot' => array( 'x' => 50, 'y' => 53, 'scale' => 0.50, 'rotation' => 0 ),
+				'ending_prop_slot'   => array( 'x' => 67, 'y' => 54, 'scale' => 0.19, 'rotation' => 0 ),
+			),
+			'2_donor'      => array(
+				'avatar_slot' => array( 'x' => 36, 'y' => 55, 'scale' => 0.47, 'rotation' => 0 ),
+				'npc_slot'    => array( 'x' => 70, 'y' => 50, 'scale' => 0.40, 'rotation' => 0 ),
+			),
+			'3_magic_item' => array(
+				'avatar_slot' => array( 'x' => 45, 'y' => 54, 'scale' => 0.49, 'rotation' => 0 ),
+				'prop_slot'   => array( 'x' => 64, 'y' => 55, 'scale' => 0.20, 'rotation' => 0 ),
+			),
+			'4_antagonist' => array(
+				'avatar_slot' => array( 'x' => 35, 'y' => 56, 'scale' => 0.46, 'rotation' => -4 ),
+				'prop_slot'   => array( 'x' => 53, 'y' => 52, 'scale' => 0.22, 'rotation' => 0 ),
+				'npc_slot'    => array( 'x' => 73, 'y' => 48, 'scale' => 0.50, 'rotation' => 0 ),
+			),
+		);
+	}
+
+	/**
+	 * Restituisce la posizione salvata di un elemento, completata con i valori predefiniti.
+	 */
+	private function get_slot_values( $opt, $step_key, $slot_key ) {
+		$defaults = $this->get_default_slots();
+		$d        = $defaults[ $step_key ][ $slot_key ] ?? array( 'x' => 50, 'y' => 50, 'scale' => 0.3, 'rotation' => 0 );
+		$s        = ( isset( $opt[ $slot_key ] ) && is_array( $opt[ $slot_key ] ) ) ? $opt[ $slot_key ] : array();
+		$out      = array();
+		foreach ( $d as $axis => $default_value ) {
+			$out[ $axis ] = isset( $s[ $axis ] ) && is_numeric( $s[ $axis ] ) ? (float) $s[ $axis ] : (float) $default_value;
+		}
+		return $out;
 	}
 
 	/**
@@ -170,95 +348,138 @@ class Propp_Book_Studio {
 
 		$manifest = $this->load_manifest();
 
-		// 1. Salva Palette Colori
+		// 1. Palette colori
 		if ( isset( $_POST['palettes'] ) && is_array( $_POST['palettes'] ) ) {
+			$posted_palettes = wp_unslash( $_POST['palettes'] ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 			foreach ( array( 'skin', 'hair', 'eyes', 'shirt' ) as $pal_key ) {
+				if ( empty( $posted_palettes[ $pal_key ]['label'] ) || ! is_array( $posted_palettes[ $pal_key ]['label'] ) ) {
+					continue;
+				}
 				$manifest['palettes'][ $pal_key ] = array();
-				if ( ! empty( $_POST['palettes'][ $pal_key ]['label'] ) ) {
-					$labels = $_POST['palettes'][ $pal_key ]['label'];
-					$hexes  = $_POST['palettes'][ $pal_key ]['hex'];
-					foreach ( $labels as $idx => $lbl ) {
-						if ( trim( $lbl ) === '' ) {
-							continue;
-						}
-						$manifest['palettes'][ $pal_key ][] = array(
-							'label' => sanitize_text_field( wp_unslash( $lbl ) ),
-							'hex'   => sanitize_hex_color( wp_unslash( $hexes[ $idx ] ) ) ?: '#000000',
-						);
-					}
-				}
-			}
-		}
-
-		// 2. Salva Acconciature SVG del Bambino
-		if ( isset( $_POST['hair_styles'] ) && is_array( $_POST['hair_styles'] ) ) {
-			$manifest['hair_styles'] = array();
-			$ids    = $_POST['hair_styles']['id'];
-			$labels = $_POST['hair_styles']['label'];
-			$svgs   = $_POST['hair_styles']['svg'];
-
-			foreach ( $labels as $idx => $lbl ) {
-				if ( trim( $lbl ) === '' ) {
-					continue;
-				}
-				$raw_id = sanitize_title( wp_unslash( ! empty( $ids[ $idx ] ) ? $ids[ $idx ] : $lbl ) );
-				$manifest['hair_styles'][] = array(
-					'id'    => str_replace( '-', '_', $raw_id ),
-					'label' => sanitize_text_field( wp_unslash( $lbl ) ),
-					'svg'   => wp_unslash( $svgs[ $idx ] ),
-				);
-			}
-		}
-
-		// 3. Salva Scenari e Carte di Propp
-		if ( isset( $_POST['propp'] ) && is_array( $_POST['propp'] ) ) {
-			foreach ( $manifest['propp_categories'] as &$cat ) {
-				$step_key = $cat['step_key'];
-				if ( empty( $_POST['propp'][ $step_key ]['label'] ) ) {
-					continue;
-				}
-				$cat['options'] = array();
-				$posted         = $_POST['propp'][ $step_key ];
-
-				foreach ( $posted['label'] as $i => $lbl ) {
-					if ( trim( $lbl ) === '' ) {
+				$labels = $posted_palettes[ $pal_key ]['label'];
+				$hexes  = $posted_palettes[ $pal_key ]['hex'] ?? array();
+				foreach ( $labels as $idx => $lbl ) {
+					if ( trim( (string) $lbl ) === '' ) {
 						continue;
 					}
-					$opt_id = sanitize_title( wp_unslash( ! empty( $posted['id'][ $i ] ) ? $posted['id'][ $i ] : $lbl ) );
-					$opt_id = str_replace( '-', '_', $opt_id );
-
-					$tokens = array();
-					if ( ! empty( $posted['tokens'][ $i ] ) && is_array( $posted['tokens'][ $i ] ) ) {
-						foreach ( $posted['tokens'][ $i ] as $t_key => $t_val ) {
-							$tokens[ sanitize_key( $t_key ) ] = sanitize_textarea_field( wp_unslash( $t_val ) );
-						}
-					}
-
-					$cat['options'][] = array(
-						'id'          => $opt_id,
-						'label'       => sanitize_text_field( wp_unslash( $lbl ) ),
-						'bg_image'    => esc_url_raw( wp_unslash( $posted['bg_image'][ $i ] ?? '' ) ),
-						'prop_image'  => esc_url_raw( wp_unslash( $posted['prop_image'][ $i ] ?? '' ) ),
-						'bg_sky'      => sanitize_hex_color( wp_unslash( $posted['bg_sky'][ $i ] ?? '#DCFCE7' ) ) ?: '#DCFCE7',
-						'bg_ground'   => sanitize_hex_color( wp_unslash( $posted['bg_ground'][ $i ] ?? '#15803D' ) ) ?: '#15803D',
-						'bg_decor'    => 'trees',
-						'prop_color'  => '#FACC15',
-						'prop_shape'  => 'lantern',
-						'avatar_slot' => array(
-							'x'        => (float) ( $posted['av_x'][ $i ] ?? 50 ),
-							'y'        => (float) ( $posted['av_y'][ $i ] ?? 54 ),
-							'scale'    => (float) ( $posted['av_scale'][ $i ] ?? 0.50 ),
-							'rotation' => (float) ( $posted['av_rot'][ $i ] ?? 0 ),
-						),
-						'prop_slot'   => array(
-							'x'     => (float) ( $posted['pr_x'][ $i ] ?? 64 ),
-							'y'     => (float) ( $posted['pr_y'][ $i ] ?? 55 ),
-							'scale' => (float) ( $posted['pr_scale'][ $i ] ?? 0.20 ),
-						),
-						'tokens'      => $tokens,
+					$manifest['palettes'][ $pal_key ][] = array(
+						'label' => sanitize_text_field( $lbl ),
+						'hex'   => sanitize_hex_color( $hexes[ $idx ] ?? '' ) ?: '#000000',
 					);
 				}
 			}
+		}
+
+		// 2. Acconciature SVG del bambino
+		if ( isset( $_POST['hair_styles'] ) && is_array( $_POST['hair_styles'] ) ) {
+			$posted_hair = wp_unslash( $_POST['hair_styles'] ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+			$labels      = is_array( $posted_hair['label'] ?? null ) ? $posted_hair['label'] : array();
+			$ids         = $posted_hair['id'] ?? array();
+			$svgs        = $posted_hair['svg'] ?? array();
+			$hair_styles = array();
+
+			foreach ( $labels as $idx => $lbl ) {
+				if ( trim( (string) $lbl ) === '' ) {
+					continue;
+				}
+				$raw_id        = sanitize_title( ! empty( $ids[ $idx ] ) ? $ids[ $idx ] : $lbl );
+				$hair_styles[] = array(
+					'id'    => str_replace( '-', '_', $raw_id ),
+					'label' => sanitize_text_field( $lbl ),
+					'svg'   => (string) ( $svgs[ $idx ] ?? '' ),
+				);
+			}
+			if ( $hair_styles ) {
+				$manifest['hair_styles'] = $hair_styles;
+			}
+		}
+
+		// 3. Scenari e carte di Propp (una riga per scheda, con chiave univoca)
+		if ( isset( $_POST['propp'] ) && is_array( $_POST['propp'] ) ) {
+			$posted_propp = wp_unslash( $_POST['propp'] ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+			$step_config  = $this->get_step_config();
+
+			foreach ( $manifest['propp_categories'] as &$cat ) {
+				$step_key = $cat['step_key'];
+				$cfg      = $step_config[ $step_key ] ?? null;
+				if ( ! $cfg || empty( $posted_propp[ $step_key ] ) || ! is_array( $posted_propp[ $step_key ] ) ) {
+					continue;
+				}
+
+				$slot_keys = array();
+				foreach ( $cfg['pages'] as $page ) {
+					$slot_keys = array_merge( $slot_keys, array_keys( $page['slots'] ) );
+				}
+
+				$options  = array();
+				$used_ids = array();
+
+				foreach ( $posted_propp[ $step_key ] as $row ) {
+					if ( ! is_array( $row ) ) {
+						continue;
+					}
+					$label = sanitize_text_field( $row['label'] ?? '' );
+					if ( '' === $label ) {
+						continue;
+					}
+
+					$opt_id = str_replace( '-', '_', sanitize_title( ! empty( $row['id'] ) ? $row['id'] : $label ) );
+					if ( '' === $opt_id ) {
+						$opt_id = 'opzione';
+					}
+					$base_id = $opt_id;
+					$n       = 2;
+					while ( in_array( $opt_id, $used_ids, true ) ) {
+						$opt_id = $base_id . '_' . $n++;
+					}
+					$used_ids[] = $opt_id;
+
+					$option = array(
+						'id'        => $opt_id,
+						'label'     => $label,
+						'bg_image'  => esc_url_raw( trim( (string) ( $row['bg_image'] ?? '' ) ) ),
+						'bg_sky'    => sanitize_hex_color( $row['bg_sky'] ?? '' ) ?: '#DCFCE7',
+						'bg_ground' => sanitize_hex_color( $row['bg_ground'] ?? '' ) ?: '#15803D',
+						'bg_decor'  => in_array( $row['bg_decor'] ?? '', array( 'trees', 'stars', 'waves', 'none' ), true ) ? $row['bg_decor'] : 'trees',
+					);
+
+					if ( $cfg['has_prop_image'] ) {
+						$option['prop_image'] = esc_url_raw( trim( (string) ( $row['prop_image'] ?? '' ) ) );
+						$option['prop_color'] = sanitize_hex_color( $row['prop_color'] ?? '' ) ?: '#FACC15';
+						$option['prop_shape'] = in_array( $row['prop_shape'] ?? '', array( 'lantern', 'key' ), true ) ? $row['prop_shape'] : 'lantern';
+					}
+					if ( $cfg['has_npc_image'] ) {
+						$option['npc_image'] = esc_url_raw( trim( (string) ( $row['npc_image'] ?? '' ) ) );
+					}
+
+					// Posizioni degli elementi nelle tavole
+					$posted_slots = ( isset( $row['slots'] ) && is_array( $row['slots'] ) ) ? $row['slots'] : array();
+					foreach ( $slot_keys as $slot_key ) {
+						$vals                = $posted_slots[ $slot_key ] ?? array();
+						$def                 = $this->get_slot_values( array(), $step_key, $slot_key );
+						$option[ $slot_key ] = array(
+							'x'        => $this->clamp_number( $vals['x'] ?? null, -50, 150, $def['x'] ),
+							'y'        => $this->clamp_number( $vals['y'] ?? null, -50, 150, $def['y'] ),
+							'scale'    => $this->clamp_number( $vals['scale'] ?? null, 0.02, 3, $def['scale'] ),
+							'rotation' => $this->clamp_number( $vals['rotation'] ?? null, -180, 180, $def['rotation'] ),
+						);
+					}
+
+					// Testi
+					$option['tokens'] = array();
+					foreach ( array_keys( $cfg['tokens'] ) as $t_key ) {
+						$option['tokens'][ $t_key ] = sanitize_textarea_field( $row['tokens'][ $t_key ] ?? '' );
+					}
+
+					$options[] = $option;
+				}
+
+				// Una fase non può restare vuota: il configuratore non saprebbe cosa mostrare
+				if ( $options ) {
+					$cat['options'] = $options;
+				}
+			}
+			unset( $cat );
 		}
 
 		file_put_contents(
@@ -270,292 +491,388 @@ class Propp_Book_Studio {
 		exit;
 	}
 
+	private function clamp_number( $value, $min, $max, $fallback ) {
+		if ( ! is_numeric( $value ) ) {
+			return (float) $fallback;
+		}
+		return round( max( $min, min( $max, (float) $value ) ), 3 );
+	}
+
+	/**
+	 * Campo immagine con miniatura e pulsante "Sfoglia" della Libreria Media
+	 */
+	private function render_media_field( $base, $field, $label, $help, $opt ) {
+		$value = $opt[ $field ] ?? '';
+		?>
+		<div class="pbs-field pbs-media-field">
+			<label><?php echo esc_html( $label ); ?></label>
+			<div class="pbs-media-row">
+				<span class="pbs-media-thumb<?php echo $value ? '' : ' is-empty'; ?>">
+					<img src="<?php echo esc_url( $value ); ?>" alt="" />
+				</span>
+				<input type="text" class="widefat" data-f="<?php echo esc_attr( $field ); ?>" name="<?php echo esc_attr( $base . '[' . $field . ']' ); ?>" value="<?php echo esc_attr( $value ); ?>" placeholder="Scegli dalla Libreria Media o incolla un URL" />
+				<button type="button" class="button pbs-upload-btn">Sfoglia</button>
+				<button type="button" class="button-link pbs-clear-btn" title="Togli immagine" aria-label="Togli immagine">✕</button>
+			</div>
+			<?php if ( $help ) : ?>
+				<p class="description"><?php echo esc_html( $help ); ?></p>
+			<?php endif; ?>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Scheda di un'opzione di Propp: campi a sinistra, anteprima interattiva a destra
+	 */
+	private function render_scenario_card( $step_key, $row_key, $opt, $cfg ) {
+		$base       = 'propp[' . $step_key . '][' . $row_key . ']';
+		$label      = $opt['label'] ?? '';
+		$first_page = (int) $cfg['pages'][0]['page'];
+		$el_labels  = array(
+			'avatar' => 'Bambino/a',
+			'prop'   => 'Oggetto magico',
+			'npc'    => $cfg['npc_label'],
+		);
+		?>
+		<div class="pbs-card" data-step="<?php echo esc_attr( $step_key ); ?>" data-preview-id="<?php echo esc_attr( $opt['id'] ?? '' ); ?>" data-page="<?php echo esc_attr( $first_page ); ?>">
+			<div class="pbs-card-head">
+				<h3 class="pbs-card-title"><?php echo esc_html( $label ? $label : 'Nuova opzione' ); ?></h3>
+				<button type="button" class="button-link pbs-card-remove">Rimuovi opzione</button>
+			</div>
+
+			<div class="pbs-card-body">
+				<div class="pbs-card-fields">
+					<div class="pbs-field">
+						<label>Titolo dell'opzione <span class="pbs-muted">(il bottone che vede il cliente)</span></label>
+						<input type="text" class="widefat pbs-label-input" data-f="label" name="<?php echo esc_attr( $base ); ?>[label]" value="<?php echo esc_attr( $label ); ?>" />
+						<input type="hidden" data-f="id" name="<?php echo esc_attr( $base ); ?>[id]" value="<?php echo esc_attr( $opt['id'] ?? '' ); ?>" />
+					</div>
+
+					<?php
+					$this->render_media_field( $base, 'bg_image', 'Illustrazione di sfondo 20x20', 'JPG o PNG quadrato, consigliato 2433×2433 px. Se non è quadrata viene ritagliata al centro.', $opt );
+
+					if ( $cfg['has_prop_image'] ) {
+						$this->render_media_field( $base, 'prop_image', 'PNG dell\'oggetto magico (scontornato)', 'Compare in questa tavola, in copertina, nella sfida e nel finale.', $opt );
+					}
+					if ( $cfg['has_npc_image'] ) {
+						$this->render_media_field( $base, 'npc_image', 'PNG del ' . strtolower( $cfg['npc_label'] ) . ' (scontornato, facoltativo)', 'Lascia vuoto se il personaggio è già disegnato nell\'illustrazione di sfondo.', $opt );
+					}
+					?>
+
+					<details class="pbs-fallback">
+						<summary>Sfondo di riserva <span class="pbs-muted">(usato solo se manca l'illustrazione)</span></summary>
+						<div class="pbs-fallback-grid">
+							<label>Cielo <input type="color" data-f="bg_sky" name="<?php echo esc_attr( $base ); ?>[bg_sky]" value="<?php echo esc_attr( $opt['bg_sky'] ?? '#DCFCE7' ); ?>" /></label>
+							<label>Terreno <input type="color" data-f="bg_ground" name="<?php echo esc_attr( $base ); ?>[bg_ground]" value="<?php echo esc_attr( $opt['bg_ground'] ?? '#15803D' ); ?>" /></label>
+							<label>Decorazione
+								<select data-f="bg_decor" name="<?php echo esc_attr( $base ); ?>[bg_decor]">
+									<?php
+									$decor = $opt['bg_decor'] ?? 'trees';
+									foreach ( array( 'trees' => 'Alberi', 'stars' => 'Stelle', 'waves' => 'Onde', 'none' => 'Nessuna' ) as $d_val => $d_lbl ) {
+										printf( '<option value="%s"%s>%s</option>', esc_attr( $d_val ), selected( $decor, $d_val, false ), esc_html( $d_lbl ) );
+									}
+									?>
+								</select>
+							</label>
+							<?php if ( $cfg['has_prop_image'] ) : ?>
+								<label>Oggetto di riserva
+									<select data-f="prop_shape" name="<?php echo esc_attr( $base ); ?>[prop_shape]">
+										<?php
+										$shape = $opt['prop_shape'] ?? 'lantern';
+										foreach ( array( 'lantern' => 'Sfera / lanterna', 'key' => 'Barretta / chiave' ) as $s_val => $s_lbl ) {
+											printf( '<option value="%s"%s>%s</option>', esc_attr( $s_val ), selected( $shape, $s_val, false ), esc_html( $s_lbl ) );
+										}
+										?>
+									</select>
+								</label>
+								<label>Colore oggetto <input type="color" data-f="prop_color" name="<?php echo esc_attr( $base ); ?>[prop_color]" value="<?php echo esc_attr( $opt['prop_color'] ?? '#FACC15' ); ?>" /></label>
+							<?php endif; ?>
+						</div>
+					</details>
+
+					<div class="pbs-tokens">
+						<?php foreach ( $cfg['tokens'] as $tk_key => $tk_label ) : ?>
+							<div class="pbs-field">
+								<label><?php echo esc_html( $tk_label ); ?></label>
+								<textarea rows="<?php echo ( false !== strpos( $tk_key, 'text' ) || 'item_gift' === $tk_key ) ? 3 : 1; ?>" class="widefat" data-f="tokens.<?php echo esc_attr( $tk_key ); ?>" name="<?php echo esc_attr( $base ); ?>[tokens][<?php echo esc_attr( $tk_key ); ?>]"><?php echo esc_textarea( $opt['tokens'][ $tk_key ] ?? '' ); ?></textarea>
+							</div>
+						<?php endforeach; ?>
+					</div>
+				</div>
+
+				<div class="pbs-card-preview">
+					<?php if ( count( $cfg['pages'] ) > 1 ) : ?>
+						<div class="pbs-page-tabs" role="tablist">
+							<?php foreach ( $cfg['pages'] as $p ) : ?>
+								<button type="button" class="pbs-page-tab<?php echo (int) $p['page'] === $first_page ? ' active' : ''; ?>" data-page="<?php echo esc_attr( $p['page'] ); ?>"><?php echo esc_html( $p['label'] ); ?></button>
+							<?php endforeach; ?>
+						</div>
+					<?php else : ?>
+						<div class="pbs-page-tabs"><span class="pbs-page-tab active is-static"><?php echo esc_html( $cfg['pages'][0]['label'] ); ?></span></div>
+					<?php endif; ?>
+
+					<div class="pbs-canvas-wrap">
+						<canvas width="800" height="800" tabindex="0" aria-label="Anteprima della tavola: trascina gli elementi per posizionarli"></canvas>
+					</div>
+					<div class="pbs-preview-warn" hidden></div>
+
+					<?php foreach ( $cfg['pages'] as $p ) : ?>
+						<table class="pbs-slot-table" data-page="<?php echo esc_attr( $p['page'] ); ?>"<?php echo (int) $p['page'] === $first_page ? '' : ' hidden'; ?>>
+							<thead>
+								<tr><th>Elemento</th><th>X %</th><th>Y %</th><th>Scala</th><th>Rotaz. °</th></tr>
+							</thead>
+							<tbody>
+								<?php foreach ( $p['slots'] as $slot_key => $el_type ) :
+									$vals = $this->get_slot_values( $opt, $step_key, $slot_key );
+									?>
+									<tr data-slot="<?php echo esc_attr( $slot_key ); ?>" data-type="<?php echo esc_attr( $el_type ); ?>">
+										<th scope="row"><span class="pbs-dot pbs-dot-<?php echo esc_attr( $el_type ); ?>"></span><?php echo esc_html( $el_labels[ $el_type ] ); ?></th>
+										<?php
+										$axes = array(
+											'x'        => array( '0.5', '-50', '150' ),
+											'y'        => array( '0.5', '-50', '150' ),
+											'scale'    => array( '0.01', '0.02', '3' ),
+											'rotation' => array( '1', '-180', '180' ),
+										);
+										foreach ( $axes as $axis => $a ) :
+											?>
+											<td><input type="number" step="<?php echo esc_attr( $a[0] ); ?>" min="<?php echo esc_attr( $a[1] ); ?>" max="<?php echo esc_attr( $a[2] ); ?>" data-f="<?php echo esc_attr( $slot_key . '.' . $axis ); ?>" data-num="1" name="<?php echo esc_attr( $base . '[slots][' . $slot_key . '][' . $axis . ']' ); ?>" value="<?php echo esc_attr( $vals[ $axis ] ); ?>" /></td>
+										<?php endforeach; ?>
+									</tr>
+								<?php endforeach; ?>
+							</tbody>
+						</table>
+					<?php endforeach; ?>
+				</div>
+			</div>
+		</div>
+		<?php
+	}
+
+	private function render_hair_card( $hair ) {
+		?>
+		<div class="pbs-hair-card" data-preview-id="<?php echo esc_attr( $hair['id'] ?? '' ); ?>">
+			<button type="button" class="pbs-hair-thumb" title="Usa questa acconciatura per il personaggio di prova">
+				<img alt="" />
+				<span class="pbs-hair-error" hidden>SVG non valido</span>
+			</button>
+			<div class="pbs-hair-fields">
+				<div class="pbs-field">
+					<label>Nome acconciatura</label>
+					<input type="text" class="widefat" name="hair_styles[label][]" value="<?php echo esc_attr( $hair['label'] ?? '' ); ?>" placeholder="Es. Trecce" />
+					<input type="hidden" name="hair_styles[id][]" value="<?php echo esc_attr( $hair['id'] ?? '' ); ?>" />
+				</div>
+				<div class="pbs-field">
+					<label>Tracciato SVG (tavola 1000×1000)</label>
+					<textarea rows="4" class="widefat pbs-code" name="hair_styles[svg][]" placeholder='<path class="fill-hair" d="..." />'><?php echo esc_textarea( $hair['svg'] ?? '' ); ?></textarea>
+				</div>
+			</div>
+			<button type="button" class="button-link pbs-hair-remove">Rimuovi</button>
+		</div>
+		<?php
+	}
+
 	/**
 	 * Renderizza la pagina di gestione in wp-admin
 	 */
 	public function render_admin_page() {
-		$manifest = $this->load_manifest();
-		$token_fields_map = array(
-			'1_setting'    => array(
-				'place_name' => 'Nome Luogo ({place_name})',
-				'intro_text' => 'Testo Pagina 1 (usa {nome}, {o_a}, {un_una}, {il_la})',
-			),
-			'2_donor'      => array(
-				'donor_name' => 'Nome Donatore ({donor_name})',
-				'donor_text' => 'Testo Pagina 2 (usa {nome}, {place_name})',
-			),
-			'3_magic_item' => array(
-				'item_name'   => 'Nome Oggetto ({item_name})',
-				'item_gift'   => 'Testo Pagina 3 (consegna oggetto)',
-				'item_action' => 'Azione Climax ({item_action} usata a Pag. 4)',
-			),
-			'4_antagonist' => array(
-				'villain_name' => 'Nome Antagonista ({villain_name})',
-				'climax_text'  => 'Testo Pagina 4 (usa {nome}, {item_action})',
-				'ending_text'  => 'Testo Pagina 5 Finale (usa {nome}, {place_name}, {item_name})',
-			),
-		);
+		$manifest    = $this->load_manifest();
+		$step_config = $this->get_step_config();
 		?>
-		<div class="wrap">
-			<h1>📚 Propp Book Studio — Gestione Scenari, Asset e Personaggio 20x20</h1>
-			<p>Usa lo shortcode <code>[propp_book_editor]</code> in qualsiasi pagina per mostrare il configuratore ai clienti.</p>
+		<div class="wrap pbs-admin">
+			<h1>📚 Propp Book Studio</h1>
+			<p class="pbs-intro">Usa lo shortcode <code>[propp_book_editor]</code> in qualsiasi pagina per mostrare il configuratore ai clienti. Ogni modifica qui sotto si vede subito nelle anteprime; diventa definitiva solo quando premi <strong>Salva il catalogo</strong>.</p>
 
-			<?php if ( isset( $_GET['updated'] ) ) : ?>
-				<div class="notice notice-success is-dismissible"><p><strong>Catalogo salvato con successo!</strong> Le modifiche sono già attive nel configuratore.</p></div>
+			<?php if ( isset( $_GET['updated'] ) ) : // phpcs:ignore WordPress.Security.NonceVerification.Recommended ?>
+				<div class="notice notice-success is-dismissible"><p><strong>Catalogo salvato.</strong> Le modifiche sono già attive nel configuratore.</p></div>
 			<?php endif; ?>
 
-			<style>
-				.pbs-admin-tabs { display:flex; gap:8px; margin:20px 0 16px; border-bottom:1px solid #cbd5e1; padding-bottom:10px; }
-				.pbs-admin-tab { padding:9px 18px; border:1px solid #cbd5e1; background:#fff; border-radius:6px; cursor:pointer; font-weight:600; font-size:14px; }
-				.pbs-admin-tab.active { background:#2271b1; color:#fff; border-color:#2271b1; }
-				.pbs-admin-section { display:none; background:#fff; border:1px solid #cbd5e1; border-radius:8px; padding:20px; margin-bottom:20px; }
-				.pbs-admin-section.active { display:block; }
-				.pbs-repeater-card { border:1px solid #cbd5e1; background:#f8fafc; border-radius:8px; padding:16px; margin-bottom:14px; }
-				.pbs-grid-4 { display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-top:12px; }
-				.pbs-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:10px; }
-				.pbs-input-full { width:100%; }
-				.pbs-remove-row { color:#b91c1c; cursor:pointer; background:none; border:none; font-weight:600; float:right; }
-			</style>
+			<div class="pbs-admin-layout">
+				<div class="pbs-admin-main">
+					<nav class="pbs-admin-tabs">
+						<button type="button" class="pbs-admin-tab active" data-target="sec-scenarios">1. Scene e carte di Propp</button>
+						<button type="button" class="pbs-admin-tab" data-target="sec-book">2. Anteprima del libro</button>
+						<button type="button" class="pbs-admin-tab" data-target="sec-hair">3. Acconciature</button>
+						<button type="button" class="pbs-admin-tab" data-target="sec-palettes">4. Palette colori</button>
+					</nav>
 
-			<div class="pbs-admin-tabs">
-				<button type="button" class="pbs-admin-tab active" data-target="sec-scenarios">1. Scenari & Carte di Propp</button>
-				<button type="button" class="pbs-admin-tab" data-target="sec-hair">2. Acconciature SVG (Bambino)</button>
-				<button type="button" class="pbs-admin-tab" data-target="sec-palettes">3. Palette Colori</button>
-			</div>
+					<form method="post" id="pbs-admin-form" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+						<input type="hidden" name="action" value="propp_save_manifest" />
+						<?php wp_nonce_field( 'propp_save_manifest_action', 'propp_manifest_nonce' ); ?>
 
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<input type="hidden" name="action" value="propp_save_manifest" />
-				<?php wp_nonce_field( 'propp_save_manifest_action', 'propp_manifest_nonce' ); ?>
+						<!-- SEZIONE 1: SCENE E CARTE DI PROPP -->
+						<section id="sec-scenarios" class="pbs-admin-section active">
+							<div class="pbs-howto">
+								<strong>Come si usa l'anteprima:</strong>
+								trascina il bambino, l'oggetto o il personaggio per spostarli;
+								tira il quadratino <span class="pbs-kbd">↘</span> per ingrandire o rimpicciolire e il pallino <span class="pbs-kbd">⟳</span> per ruotare.
+								Con l'elemento selezionato puoi usare le frecce della tastiera (con Maiusc il passo è più lungo).
+								La linea rossa tratteggiata è il taglio, quella blu il margine di sicurezza: tieni volti e testi dentro la blu.
+							</div>
 
-				<!-- SEZIONE 1: SCENARI E CARTE DI PROPP -->
-				<div id="sec-scenarios" class="pbs-admin-section active">
-					<p>Carica qui gli sfondi illustrati 20x20 cm (consigliato <code>2433x2433 px</code>), imposta le coordinate <code>X, Y, Scala</code> dove comparirà il PNG scontornato del bambino e personalizza i testi.</p>
+							<nav class="pbs-step-nav">
+								<?php foreach ( $manifest['propp_categories'] as $cat ) : ?>
+									<a href="#pbs-step-<?php echo esc_attr( $cat['step_key'] ); ?>"><?php echo esc_html( $cat['title'] ); ?></a>
+								<?php endforeach; ?>
+							</nav>
 
-					<?php foreach ( $manifest['propp_categories'] as $cat ) :
-						$step_key = $cat['step_key'];
-						$t_fields = $token_fields_map[ $step_key ] ?? array();
-						?>
-						<hr style="margin:24px 0;" />
-						<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-							<h2 style="margin:0;"><?php echo esc_html( $cat['title'] ); ?></h2>
-							<button type="button" class="button pbs-add-scenario-btn" data-step="<?php echo esc_attr( $step_key ); ?>">+ Aggiungi Opzione a questa fase</button>
-						</div>
-
-						<div id="repeater-<?php echo esc_attr( $step_key ); ?>">
-							<?php foreach ( $cat['options'] as $i => $opt ) : ?>
-								<div class="pbs-repeater-card">
-									<button type="button" class="pbs-remove-row" onclick="this.parentElement.remove()">✕ Rimuovi</button>
-									<div class="pbs-grid-2">
-										<div>
-											<label><strong>Titolo Opzione (Bottone)</strong></label>
-											<input type="text" class="pbs-input-full" name="propp[<?php echo esc_attr( $step_key ); ?>][label][]" value="<?php echo esc_attr( $opt['label'] ); ?>" required />
-											<input type="hidden" name="propp[<?php echo esc_attr( $step_key ); ?>][id][]" value="<?php echo esc_attr( $opt['id'] ); ?>" />
-										</div>
-										<div style="display:flex;gap:12px;">
-											<div style="flex:1;">
-												<label><strong>Sfondo Illustrato 20x20 (JPG/PNG)</strong></label>
-												<div style="display:flex;gap:6px;">
-													<input type="text" class="pbs-input-full" name="propp[<?php echo esc_attr( $step_key ); ?>][bg_image][]" value="<?php echo esc_attr( $opt['bg_image'] ?? '' ); ?>" placeholder="URL dalla Libreria Media..." />
-													<button type="button" class="button pbs-upload-btn">Sfoglia</button>
-												</div>
-											</div>
-											<?php if ( '3_magic_item' === $step_key ) : ?>
-											<div style="flex:1;">
-												<label><strong>PNG Oggetto Magico Scontornato</strong></label>
-												<div style="display:flex;gap:6px;">
-													<input type="text" class="pbs-input-full" name="propp[<?php echo esc_attr( $step_key ); ?>][prop_image][]" value="<?php echo esc_attr( $opt['prop_image'] ?? '' ); ?>" placeholder="PNG trasparente..." />
-													<button type="button" class="button pbs-upload-btn">Sfoglia</button>
-												</div>
-											</div>
-											<?php endif; ?>
-										</div>
+							<?php foreach ( $manifest['propp_categories'] as $cat ) :
+								$step_key = $cat['step_key'];
+								$cfg      = $step_config[ $step_key ] ?? null;
+								if ( ! $cfg ) {
+									continue;
+								}
+								?>
+								<div class="pbs-step" id="pbs-step-<?php echo esc_attr( $step_key ); ?>">
+									<div class="pbs-step-head">
+										<h2><?php echo esc_html( $cat['title'] ); ?></h2>
+										<button type="button" class="button pbs-add-scenario-btn" data-step="<?php echo esc_attr( $step_key ); ?>">+ Aggiungi opzione</button>
 									</div>
 
-									<div class="pbs-grid-4">
-										<div>
-											<label>Posizione Bambino X (%)</label>
-											<input type="number" step="0.5" class="pbs-input-full" name="propp[<?php echo esc_attr( $step_key ); ?>][av_x][]" value="<?php echo esc_attr( $opt['avatar_slot']['x'] ?? 50 ); ?>" />
-										</div>
-										<div>
-											<label>Posizione Bambino Y (%)</label>
-											<input type="number" step="0.5" class="pbs-input-full" name="propp[<?php echo esc_attr( $step_key ); ?>][av_y][]" value="<?php echo esc_attr( $opt['avatar_slot']['y'] ?? 54 ); ?>" />
-										</div>
-										<div>
-											<label>Scala Bambino (es. 0.50)</label>
-											<input type="number" step="0.01" class="pbs-input-full" name="propp[<?php echo esc_attr( $step_key ); ?>][av_scale][]" value="<?php echo esc_attr( $opt['avatar_slot']['scale'] ?? 0.50 ); ?>" />
-										</div>
-										<div>
-											<label>Rotazione (°)</label>
-											<input type="number" step="1" class="pbs-input-full" name="propp[<?php echo esc_attr( $step_key ); ?>][av_rot][]" value="<?php echo esc_attr( $opt['avatar_slot']['rotation'] ?? 0 ); ?>" />
-										</div>
+									<div class="pbs-repeater" id="repeater-<?php echo esc_attr( $step_key ); ?>">
+										<?php
+										foreach ( $cat['options'] as $i => $opt ) {
+											$this->render_scenario_card( $step_key, (string) $i, $opt, $cfg );
+										}
+										?>
 									</div>
 
-									<input type="hidden" name="propp[<?php echo esc_attr( $step_key ); ?>][bg_sky][]" value="<?php echo esc_attr( $opt['bg_sky'] ?? '#DCFCE7' ); ?>" />
-									<input type="hidden" name="propp[<?php echo esc_attr( $step_key ); ?>][bg_ground][]" value="<?php echo esc_attr( $opt['bg_ground'] ?? '#15803D' ); ?>" />
-
-									<div class="pbs-grid-2" style="margin-top:12px;">
-										<?php foreach ( $t_fields as $tk_key => $tk_label ) : ?>
-											<div>
-												<label><strong><?php echo esc_html( $tk_label ); ?></strong></label>
-												<textarea rows="2" class="pbs-input-full" name="propp[<?php echo esc_attr( $step_key ); ?>][tokens][<?php echo esc_attr( $i ); ?>][<?php echo esc_attr( $tk_key ); ?>]"><?php echo esc_textarea( $opt['tokens'][ $tk_key ] ?? '' ); ?></textarea>
-											</div>
-										<?php endforeach; ?>
-									</div>
+									<template id="pbs-tpl-<?php echo esc_attr( $step_key ); ?>">
+										<?php
+										$blank = array(
+											'id'     => '',
+											'label'  => '',
+											'tokens' => array(),
+										);
+										if ( ! empty( $cat['options'][0] ) ) {
+											foreach ( array( 'bg_sky', 'bg_ground', 'bg_decor', 'prop_color', 'prop_shape' ) as $copy_key ) {
+												if ( isset( $cat['options'][0][ $copy_key ] ) ) {
+													$blank[ $copy_key ] = $cat['options'][0][ $copy_key ];
+												}
+											}
+										}
+										$this->render_scenario_card( $step_key, '__KEY__', $blank, $cfg );
+										?>
+									</template>
 								</div>
 							<?php endforeach; ?>
-						</div>
-					<?php endforeach; ?>
-				</div>
+						</section>
 
-				<!-- SEZIONE 2: ACCONCIATURE DEL BAMBINO -->
-				<div id="sec-hair" class="pbs-admin-section">
-					<p>Incolla qui i tracciati SVG (su artboard <code>1000x1000</code>) esportati da Illustrator. Usa <code>class="fill-hair"</code> sui tracciati che devono prendere il colore scelto dall'utente.</p>
-					<div id="pbs-hair-repeater">
-						<?php foreach ( $manifest['hair_styles'] as $hair ) : ?>
-							<div class="pbs-repeater-card">
-								<button type="button" class="pbs-remove-row" onclick="this.parentElement.remove()">✕ Rimuovi</button>
-								<div class="pbs-grid-2">
-									<div>
-										<label><strong>Nome Acconciatura</strong></label>
-										<input type="text" class="pbs-input-full" name="hair_styles[label][]" value="<?php echo esc_attr( $hair['label'] ); ?>" />
-										<input type="hidden" name="hair_styles[id][]" value="<?php echo esc_attr( $hair['id'] ); ?>" />
-									</div>
-									<div>
-										<label><strong>Tracciato SVG (1000x1000)</strong></label>
-										<textarea rows="3" class="pbs-input-full" style="font-family:monospace;font-size:12px;" name="hair_styles[svg][]"><?php echo esc_textarea( $hair['svg'] ); ?></textarea>
-									</div>
-								</div>
+						<!-- SEZIONE 2: ANTEPRIMA DEL LIBRO COMPLETO -->
+						<section id="sec-book" class="pbs-admin-section">
+							<p>Scegli una combinazione di carte e controlla tutte le tavole una dopo l'altra, come le vedrà il cliente con il personaggio di prova. Clicca su una tavola per andare a modificarne le posizioni.</p>
+							<div class="pbs-book-controls">
+								<?php foreach ( $manifest['propp_categories'] as $cat ) : ?>
+									<label>
+										<span><?php echo esc_html( $cat['title'] ); ?></span>
+										<select class="pbs-book-select" data-step="<?php echo esc_attr( $cat['step_key'] ); ?>"></select>
+									</label>
+								<?php endforeach; ?>
+								<button type="button" class="button" id="pbs-book-pdf">⬇ Scarica PDF di prova</button>
 							</div>
-						<?php endforeach; ?>
-					</div>
-					<button type="button" class="button" id="pbs-add-hair-btn">+ Aggiungi Nuova Acconciatura</button>
-				</div>
+							<div class="pbs-book-grid" id="pbs-book-grid"></div>
+						</section>
 
-				<!-- SEZIONE 3: PALETTE COLORI -->
-				<div id="sec-palettes" class="pbs-admin-section">
-					<div class="pbs-grid-2">
-						<?php
-						$pal_titles = array(
-							'skin'  => 'Carnagioni',
-							'hair'  => 'Colori Capelli',
-							'eyes'  => 'Colori Occhi',
-							'shirt' => 'Colori Maglietta',
-						);
-						foreach ( $pal_titles as $p_key => $p_title ) :
-							?>
-							<div class="pbs-repeater-card">
-								<h3><?php echo esc_html( $p_title ); ?></h3>
-								<div id="pal-wrap-<?php echo esc_attr( $p_key ); ?>">
-									<?php foreach ( $manifest['palettes'][ $p_key ] as $col ) : ?>
-										<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
-											<input type="color" name="palettes[<?php echo esc_attr( $p_key ); ?>][hex][]" value="<?php echo esc_attr( $col['hex'] ); ?>" />
-											<input type="text" class="pbs-input-full" name="palettes[<?php echo esc_attr( $p_key ); ?>][label][]" value="<?php echo esc_attr( $col['label'] ); ?>" />
-											<button type="button" class="button-link-delete" onclick="this.parentElement.remove()">✕</button>
+						<!-- SEZIONE 3: ACCONCIATURE -->
+						<section id="sec-hair" class="pbs-admin-section">
+							<p>Incolla qui i tracciati SVG (tavola <code>1000×1000</code>) esportati da Illustrator. Usa <code>class="fill-hair"</code> sui tracciati che devono prendere il colore scelto dal cliente. La miniatura si aggiorna mentre scrivi; cliccaci sopra per provarla sul personaggio di prova.</p>
+							<div id="pbs-hair-repeater" class="pbs-hair-grid">
+								<?php
+								foreach ( $manifest['hair_styles'] as $hair ) {
+									$this->render_hair_card( $hair );
+								}
+								?>
+							</div>
+							<template id="pbs-tpl-hair"><?php $this->render_hair_card( array() ); ?></template>
+							<button type="button" class="button" id="pbs-add-hair-btn">+ Aggiungi acconciatura</button>
+						</section>
+
+						<!-- SEZIONE 4: PALETTE COLORI -->
+						<section id="sec-palettes" class="pbs-admin-section">
+							<p>I colori tra cui può scegliere il cliente. Il personaggio di prova qui a fianco si aggiorna con le palette che stai modificando.</p>
+							<div class="pbs-palette-grid">
+								<?php
+								$pal_titles = array(
+									'skin'  => 'Carnagioni',
+									'hair'  => 'Colori capelli',
+									'eyes'  => 'Colori occhi',
+									'shirt' => 'Colori maglietta',
+								);
+								foreach ( $pal_titles as $p_key => $p_title ) :
+									?>
+									<div class="pbs-palette-card">
+										<h3><?php echo esc_html( $p_title ); ?></h3>
+										<div id="pal-wrap-<?php echo esc_attr( $p_key ); ?>" class="pbs-pal-wrap" data-pal="<?php echo esc_attr( $p_key ); ?>">
+											<?php foreach ( ( $manifest['palettes'][ $p_key ] ?? array() ) as $col ) : ?>
+												<div class="pbs-pal-row">
+													<input type="color" name="palettes[<?php echo esc_attr( $p_key ); ?>][hex][]" value="<?php echo esc_attr( $col['hex'] ); ?>" />
+													<input type="text" class="widefat" name="palettes[<?php echo esc_attr( $p_key ); ?>][label][]" value="<?php echo esc_attr( $col['label'] ); ?>" />
+													<button type="button" class="button-link-delete pbs-pal-remove" aria-label="Rimuovi colore">✕</button>
+												</div>
+											<?php endforeach; ?>
 										</div>
-									<?php endforeach; ?>
-								</div>
-								<button type="button" class="button pbs-add-color-btn" data-pal="<?php echo esc_attr( $p_key ); ?>">+ Aggiungi Colore</button>
+										<button type="button" class="button pbs-add-color-btn" data-pal="<?php echo esc_attr( $p_key ); ?>">+ Aggiungi colore</button>
+									</div>
+								<?php endforeach; ?>
 							</div>
-						<?php endforeach; ?>
-					</div>
+						</section>
+					</form>
 				</div>
 
-				<p class="submit">
-					<button type="submit" class="button button-primary button-hero">💾 Salva Tutto il Catalogo</button>
-				</p>
-			</form>
+				<!-- PERSONAGGIO DI PROVA (solo anteprima, non viene salvato) -->
+				<aside class="pbs-admin-side">
+					<div class="pbs-side-card">
+						<h2>Personaggio di prova</h2>
+						<p class="pbs-muted">Serve solo per le anteprime: prova combinazioni diverse per controllare che il bambino stia bene in ogni scena.</p>
+						<div class="pbs-side-avatar">
+							<img id="pbs-test-avatar" alt="Anteprima del personaggio" />
+						</div>
+						<div class="pbs-side-row">
+							<label for="pbs-test-name">Nome</label>
+							<input type="text" id="pbs-test-name" value="Giorgio" maxlength="22" />
+						</div>
+						<div class="pbs-side-row">
+							<span class="pbs-side-label">Sesso</span>
+							<div class="pbs-seg" id="pbs-test-gender">
+								<button type="button" class="active" data-value="M">Bambino</button>
+								<button type="button" data-value="F">Bambina</button>
+							</div>
+						</div>
+						<div class="pbs-side-row">
+							<label for="pbs-test-hair">Acconciatura</label>
+							<select id="pbs-test-hair"></select>
+						</div>
+						<div class="pbs-side-row">
+							<span class="pbs-side-label">Carnagione</span>
+							<div class="pbs-side-swatches" data-key="skinColor" data-pal="skin"></div>
+						</div>
+						<div class="pbs-side-row">
+							<span class="pbs-side-label">Capelli</span>
+							<div class="pbs-side-swatches" data-key="hairColor" data-pal="hair"></div>
+						</div>
+						<div class="pbs-side-row">
+							<span class="pbs-side-label">Occhi</span>
+							<div class="pbs-side-swatches" data-key="eyeColor" data-pal="eyes"></div>
+						</div>
+						<div class="pbs-side-row">
+							<span class="pbs-side-label">Maglietta</span>
+							<div class="pbs-side-swatches" data-key="shirtColor" data-pal="shirt"></div>
+						</div>
+						<div class="pbs-side-row">
+							<label class="pbs-check"><input type="checkbox" id="pbs-test-glasses" /> Occhiali tondi</label>
+						</div>
+						<hr />
+						<div class="pbs-side-row">
+							<label class="pbs-check"><input type="checkbox" id="pbs-show-guides" checked /> Mostra taglio e margini di sicurezza</label>
+						</div>
+						<button type="submit" form="pbs-admin-form" class="button button-primary button-large pbs-save-btn">💾 Salva il catalogo</button>
+						<p class="pbs-dirty-note" id="pbs-dirty-note" hidden>Hai modifiche non salvate.</p>
+					</div>
+				</aside>
+			</div>
 		</div>
-
-		<script>
-		document.addEventListener('DOMContentLoaded', function() {
-			// Navigazione Tab Admin
-			document.querySelectorAll('.pbs-admin-tab').forEach(tab => {
-				tab.addEventListener('click', function() {
-					document.querySelectorAll('.pbs-admin-tab').forEach(t => t.classList.remove('active'));
-					document.querySelectorAll('.pbs-admin-section').forEach(s => s.classList.remove('active'));
-					this.classList.add('active');
-					document.getElementById(this.dataset.target).classList.add('active');
-				});
-			});
-
-			// Apertura Libreria Media di WordPress per caricare sfondi e PNG
-			document.body.addEventListener('click', function(e) {
-				if (!e.target.classList.contains('pbs-upload-btn')) return;
-				e.preventDefault();
-				const inputField = e.target.previousElementSibling;
-				const frame = wp.media({
-					title: 'Seleziona Illustrazione 20x20 o PNG',
-					button: { text: 'Usa questo file' },
-					multiple: false
-				});
-				frame.on('select', function() {
-					const attachment = frame.state().get('selection').first().toJSON();
-					inputField.value = attachment.url;
-				});
-				frame.open();
-			});
-
-			// Aggiunta nuova acconciatura SVG
-			document.getElementById('pbs-add-hair-btn').addEventListener('click', function() {
-				const container = document.getElementById('pbs-hair-repeater');
-				const div = document.createElement('div');
-				div.className = 'pbs-repeater-card';
-				div.innerHTML = `
-					<button type="button" class="pbs-remove-row" onclick="this.parentElement.remove()">✕ Rimuovi</button>
-					<div class="pbs-grid-2">
-						<div>
-							<label><strong>Nome Acconciatura</strong></label>
-							<input type="text" class="pbs-input-full" name="hair_styles[label][]" placeholder="Es. Trecce" />
-							<input type="hidden" name="hair_styles[id][]" value="" />
-						</div>
-						<div>
-							<label><strong>Tracciato SVG (1000x1000)</strong></label>
-							<textarea rows="3" class="pbs-input-full" style="font-family:monospace;font-size:12px;" name="hair_styles[svg][]" placeholder='<path class="fill-hair" d="..." />'></textarea>
-						</div>
-					</div>`;
-				container.appendChild(div);
-			});
-
-			// Aggiunta nuovo colore in palette
-			document.querySelectorAll('.pbs-add-color-btn').forEach(btn => {
-				btn.addEventListener('click', function() {
-					const pal = this.dataset.pal;
-					const wrap = document.getElementById('pal-wrap-' + pal);
-					const row = document.createElement('div');
-					row.style.cssText = 'display:flex;gap:8px;margin-bottom:8px;align-items:center;';
-					row.innerHTML = `
-						<input type="color" name="palettes[${pal}][hex][]" value="#3B82F6" />
-						<input type="text" class="pbs-input-full" name="palettes[${pal}][label][]" placeholder="Nome colore..." />
-						<button type="button" class="button-link-delete" onclick="this.parentElement.remove()">✕</button>`;
-					wrap.appendChild(row);
-				});
-			});
-
-			// Clonazione card scenario per aggiungere nuovi ambienti/carte di Propp
-			document.querySelectorAll('.pbs-add-scenario-btn').forEach(btn => {
-				btn.addEventListener('click', function() {
-					const stepKey = this.dataset.step;
-					const container = document.getElementById('repeater-' + stepKey);
-					const cards = container.querySelectorAll('.pbs-repeater-card');
-					if (!cards.length) return;
-					const newIndex = cards.length;
-					const clone = cards[cards.length - 1].cloneNode(true);
-					clone.querySelectorAll('input[type="text"], input[type="hidden"], textarea').forEach(inp => {
-						if (inp.name.includes('[tokens]')) {
-							inp.name = inp.name.replace(/\[tokens\]\[\d+\]/, '[tokens][' + newIndex + ']');
-						}
-						if (inp.type !== 'hidden' || inp.name.includes('[id]')) {
-							inp.value = '';
-						}
-					});
-					container.appendChild(clone);
-				});
-			});
-		});
-		</script>
 		<?php
 	}
-
 	/**
 	 * Shortcode [propp_book_editor]
 	 */
